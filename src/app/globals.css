@@ -1,0 +1,147 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  position: relative;
+  overflow-x: hidden;
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 263 84% 58%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 205 90% 68%;
+    --accent-foreground: 263 84% 48%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 262 84% 58%;
+    --radius: 0.5rem;
+
+    --header-height: 5rem; /* 80px */
+  }
+
+  @media (min-width: 640px) {
+    :root {
+      --header-height: 7rem; /* 112px */
+    }
+  }
+
+  .dark {
+    --background: 220 29% 6%;
+    --foreground: 0 0% 98%;
+    --card: 220 15% 8%;
+    --card-foreground: 0 0% 98%;
+    --popover: 224 71% 4%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 257 100% 71%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 215 14% 75%;
+    --accent: 280 100% 80%;
+    --accent-foreground: 257 100% 81%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 257 100% 71%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  .dark body {
+     background: linear-gradient(135deg, #1a202c 0%, #0B0D12 100%);
+  }
+}
+
+@layer utilities {
+  @keyframes scroll {
+    to {
+      transform: translate(calc(-50% - 1rem));
+    }
+  }
+}
+
+
+@layer components {
+    .button-glow {
+        box-shadow: 0 0 15px 0px hsl(var(--primary) / 0.4);
+    }
+    .animated-underline {
+        position: relative;
+        text-decoration: none;
+        transition: color 0.3s ease;
+    }
+
+    .animated-underline:hover {
+        color: hsl(var(--primary-foreground));
+    }
+    
+    .animated-underline::after {
+        content: '';
+        position: absolute;
+        width: 100%;
+        transform: scaleX(0);
+        height: 2px;
+        bottom: -2px;
+        left: 0;
+        background-color: hsl(var(--primary));
+        transform-origin: bottom right;
+        transition: transform 0.3s ease-out;
+    }
+    
+    .animated-underline:hover::after {
+        transform: scaleX(1);
+        transform-origin: bottom left;
+    }
+
+    .chat-widget-container {
+        @apply fixed inset-0 z-50 flex flex-col items-center justify-center p-0 sm:p-4;
+    }
+    
+    @media (min-width: 640px) {
+      .chat-widget-container {
+        @apply items-end justify-end;
+      }
+    }
+    
+    .chat-widget-card,
+    .chat-widget-card-menu {
+      @apply w-full h-full;
+      @apply sm:w-full sm:max-w-sm;
+      @apply sm:h-[calc(100vh-100px)] md:h-[650px];
+      @apply sm:rounded-xl;
+    }
+    
+    .chat-widget-card-menu {
+      @apply flex flex-col shadow-2xl overflow-hidden;
+    }
+
+    .menu-header {
+      background: linear-gradient(135deg, hsl(var(--primary) / 0.9), hsl(var(--accent) / 0.8));
+    }
+}
