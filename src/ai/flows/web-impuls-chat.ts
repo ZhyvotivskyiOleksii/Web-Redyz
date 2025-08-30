@@ -10,6 +10,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import { buildSiteKnowledge, fetchRelevantDocs } from '@/lib/knowledge';
 
 const WebImpulsChatInputSchema = z.object({
   query: z.string().describe('The user\'s message or question.'),
@@ -17,6 +18,7 @@ const WebImpulsChatInputSchema = z.object({
       role: z.enum(['user', 'assistant']),
       content: z.string(),
   })).describe('The history of the conversation so far.'),
+  locale: z.string().optional().describe('UI locale (ru/ua/en).'),
 });
 export type WebImpulsChatInput = z.infer<typeof WebImpulsChatInputSchema>;
 
@@ -204,27 +206,39 @@ const prompt = ai.definePrompt({
   name: 'webImpulsChatPrompt',
   input: {schema: WebImpulsChatInputSchema},
   output: {schema: WebImpulsChatOutputSchema},
-  prompt: `You are "AI Web Impuls", a friendly, conversational, and professional AI assistant for the WebImpuls development studio. Your goal is to help potential clients.
+  prompt: `You are "AI Web Impuls", a friendly, expert and consultative sales assistant for the WebImpuls studio.
 
-**Core Instructions:**
-1.  **Be Conversational:** Engage in a natural, friendly dialogue. Handle greetings, small talk, and typos gracefully. Don't be a rigid robot.
-2.  **Language Proficiency:** You MUST detect the language of the user's most recent message ('query') and respond in that **exact same language**. Use the corresponding language block from your knowledge base.
-3.  **Knowledge Base is Key:** For any questions about services, pricing, timelines, or technologies, your answers MUST be based **strictly** on the "WebImpuls Studio Information" provided below.
-4.  **Know Your Limits:** If a question is outside the scope of the provided information (e.g., asking for a custom quote on a very complex, undefined project), politely state that you can't provide a precise answer and recommend contacting a manager through the official channels listed in your knowledge base. Don't invent information.
-5.  **Use Context:** Pay attention to the \`chatHistory\` to understand the flow of the conversation.
+Respond in the language of the user's latest message (query). Use the facts ONLY from:
+1) Structured Site Knowledge below, and 2) Optional Supporting Docs.
+If information is missing or uncertain, say so and propose to contact a manager (do not invent facts).
 
-**WebImpuls Studio Information (Multilingual):**
+Sales style (succinct, helpful, consultative, not pushy):
+- Start with a short acknowledgment and 1 clarifying question at a time.
+- Prioritize understanding goals/scope and timeline before discussing budget. Do not lead with budget.
+- Recommend 1 primary offer and optionally 1 alternative (cheaper or more advanced), with bullet points for scope, timeline and price ranges from knowledge.
+- Only suggest leaving contacts after the user shows readiness (e.g., asks about next steps) or after several exchanges when it feels natural. Be polite and optional.
+- Keep tone warm, respectful, and professional. Avoid sounding like you are insisting or rushing.
+
+Grounding rules:
+- Prices and timelines MUST come from the structured knowledge below; do not alter ranges.
+- If supporting docs add relevant details, include them but do not contradict the structured data.
+- If the user asks beyond knowledge scope, say you can't provide exact numbers and recommend manager contact.
+
+Structured Site Knowledge (localized):
 {{{siteKnowledge}}}
 
-**Conversation History:**
+Supporting Docs (optional):
+{{{supportingDocs}}}
+
+Conversation History:
 {{#each chatHistory}}
 {{role}}: {{content}}
 {{/each}}
 
-**User's new message:**
+User's new message:
 {{query}}
 
-**Your response (in the same language as the user's new message):**
+Your response (strictly grounded, same language):
 `,
 });
 
@@ -235,7 +249,23 @@ const webImpulsChatFlow = ai.defineFlow(
     outputSchema: WebImpulsChatOutputSchema,
   },
   async (input) => {
-    const {output} = await prompt({...input, siteKnowledge});
+    const loc = input.locale || 'ua';
+    const siteKnowledgeDynamic = buildSiteKnowledge(loc);
+    let supportingDocs = '';
+    if (input.query && input.query.trim().length > 0) {
+      const docs = await fetchRelevantDocs(input.query, loc);
+      if (docs.length) {
+        supportingDocs = docs
+          .map((d, i) => `Doc ${i + 1}: ${d.title}\n${d.content}`)
+          .join('\n\n');
+      }
+    }
+
+    const {output} = await prompt({
+      ...input,
+      siteKnowledge: siteKnowledgeDynamic,
+      supportingDocs,
+    });
     return output!;
   }
 );

@@ -1,0 +1,9 @@
+{
+  "studio": {"description": "WebImpuls — we build fast, conversion‑focused websites."},
+  "services": [
+    {"id": "landing", "title": "Landing Page", "description": "Sales page with modern UI/animations.", "price": {"min": 800, "max": 1500, "currency": "$"}, "timeline": {"daysMin": 5, "daysMax": 7}, "includes": ["Responsive", "Animations", "SEO", "Analytics", "Form"], "addons": ["Copywriting", "Illustrations", "Extra sections"]},
+    {"id": "corporate", "title": "Corporate Site", "description": "Representative website for business.", "price": {"min": 2500, "max": 5000, "currency": "$"}, "timeline": {"daysMin": 14, "daysMax": 21}, "includes": ["Multi‑page", "Admin panel", "Blog", "Gallery", "Contacts", "Multilingual"], "addons": ["Content import", "Migration", "Design system"]},
+    {"id": "ecommerce", "title": "E‑commerce", "description": "Full e‑commerce with cart & payments.", "price": {"min": 4000, "max": 8000, "currency": "$"}, "timeline": {"daysMin": 21, "daysMax": 35}, "includes": ["Catalog+filters", "Cart/orders", "Payments", "Account", "Admin", "Discounts"], "addons": ["3rd‑party integrations", "Product import", "CRM"]}
+  ]
+}
+

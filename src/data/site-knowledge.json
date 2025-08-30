@@ -1,0 +1,67 @@
+{
+  "ua": {
+    "studio": {
+      "description": "Створюємо швидкі та ефективні веб-рішення для зростання бізнесу."
+    },
+    "services": [
+      {
+        "id": "landing",
+        "title": "Лендінг",
+        "price": "$800 - $1,500",
+        "timeline": "5-7 днів",
+        "includes": [
+          "Адаптивний дизайн",
+          "Сучасні анімації",
+          "SEO-оптимізація",
+          "Інтеграція з аналітикою",
+          "Форма зворотного зв'язку",
+          "Швидке завантаження"
+        ]
+      },
+      {
+        "id": "corporate",
+        "title": "Корпоративний сайт",
+        "price": "$2,500 - $5,000",
+        "timeline": "14-21 днів",
+        "includes": ["Багатосторінкова структура", "Адмін-панель", "Блог", "Галерея", "Контакти і карти", "Багатомовність"]
+      },
+      {
+        "id": "ecommerce",
+        "title": "Інтернет-магазин",
+        "price": "$4,000 - $8,000",
+        "timeline": "21-35 днів",
+        "includes": ["Каталог з фільтрами", "Кошик та замовлення", "Платежі", "Особистий кабінет", "Адмін-панель", "Система знижок"]
+      }
+    ],
+    "contact": {
+      "telegram": "https://t.me/oleksiy_zhyvotivskyi",
+      "viber": "viber://chat?number=%2B48512686628",
+      "messenger": "https://m.me/61559794323482"
+    }
+  },
+  "ru": {
+    "studio": {
+      "description": "Создаём быстрые и эффективные веб-решения для роста бизнеса."
+    },
+    "services": [
+      {"id": "landing", "title": "Лендинг", "price": "$800 - $1,500", "timeline": "5-7 дней", "includes": ["Адаптивный дизайн", "Современные анимации", "SEO", "Аналитика", "Форма", "Быстрая загрузка"]},
+      {"id": "corporate", "title": "Корпоративный сайт", "price": "$2,500 - $5,000", "timeline": "14-21 день", "includes": ["Многостраничность", "Админ-панель", "Блог", "Галерея", "Контакты и карта", "Мультиязычность"]},
+      {"id": "ecommerce", "title": "Интернет-магазин", "price": "$4,000 - $8,000", "timeline": "21-35 дней", "includes": ["Каталог + фильтры", "Корзина/заказы", "Платежи", "Личный кабинет", "Админ-панель", "Скидки"]}
+    ],
+    "contact": {
+      "telegram": "https://t.me/oleksiy_zhyvotivskyi",
+      "viber": "viber://chat?number=%2B48512686628",
+      "messenger": "https://m.me/61559794323482"
+    }
+  },
+  "en": {
+    "studio": {"description": "We build fast, effective web solutions to grow your business."},
+    "services": [
+      {"id": "landing", "title": "Landing Page", "price": "$800 - $1,500", "timeline": "5-7 days", "includes": ["Responsive design", "Modern animations", "SEO", "Analytics", "Contact form", "Fast load"]},
+      {"id": "corporate", "title": "Corporate Website", "price": "$2,500 - $5,000", "timeline": "14-21 days", "includes": ["Multi-page", "Admin panel", "Blog", "Gallery", "Contacts & map", "Multilingual"]},
+      {"id": "ecommerce", "title": "E-commerce", "price": "$4,000 - $8,000", "timeline": "21-35 days", "includes": ["Catalog + filters", "Cart/orders", "Payments", "Account", "Admin panel", "Discounts"]}
+    ],
+    "contact": {"telegram": "https://t.me/oleksiy_zhyvotivskyi", "viber": "viber://chat?number=%2B48512686628", "messenger": "https://m.me/61559794323482"}
+  }
+}
+

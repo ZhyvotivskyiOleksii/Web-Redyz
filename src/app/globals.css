@@ -144,4 +144,13 @@ body {
     .menu-header {
       background: linear-gradient(135deg, hsl(var(--primary) / 0.9), hsl(var(--accent) / 0.8));
     }
+
+    /* Force the FAB to bottom-right regardless of parent transforms */
+    .chat-fab {
+      position: fixed;
+      right: max(1.25rem, env(safe-area-inset-right));
+      left: auto !important;
+      bottom: max(1.25rem, env(safe-area-inset-bottom));
+      z-index: 9999;
+    }
 }
