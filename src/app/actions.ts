@@ -296,12 +296,56 @@ export async function saveContact(value: string, locale?: string) {
 // Зберігає ім'я та контакт одним запитом з чату
 export async function saveLeadDetails(input: { name?: string; contact: string; locale?: string }) {
   try {
-    const chatId = await getOrCreateChatId();
+    const currentChatId = await getOrCreateChatId();
     const detected = extractContact(input.contact);
     const name = input.name?.trim() || undefined;
     if (!detected) return { success: false, error: 'Вкажіть коректний e-mail або телефон.' };
-    await upsertLead({ chatId, ...detected, name, locale: input.locale, firstMessage: input.contact, source: 'chat' });
-    return { success: true };
+
+    const supabase = getSupabaseClient();
+
+    // 1) Спробувати знайти існуючий лід за email/телефоном і прийняти пов'язаний чат
+    try {
+      const candidates: Array<{ id: number; chat_id: string; updated_at: string; created_at: string }> = [] as any;
+      if (detected.email) {
+        const { data: byEmail } = await supabase
+          .from('leads')
+          .select('id, chat_id, updated_at, created_at')
+          .eq('email', detected.email)
+          .order('updated_at', { ascending: false })
+          .limit(1);
+        if (Array.isArray(byEmail) && byEmail.length > 0) candidates.push(byEmail[0] as any);
+      }
+      if (detected.phone) {
+        const { data: byPhone } = await supabase
+          .from('leads')
+          .select('id, chat_id, updated_at, created_at')
+          .eq('phone', detected.phone)
+          .order('updated_at', { ascending: false })
+          .limit(1);
+        if (Array.isArray(byPhone) && byPhone.length > 0) candidates.push(byPhone[0] as any);
+      }
+      if (candidates.length > 0) {
+        const best = candidates.sort((a, b) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime())[0];
+        const foundChatId = best.chat_id;
+        if (foundChatId && foundChatId !== currentChatId) {
+          const adopted = await adoptChatSession(foundChatId);
+          if (adopted?.success) {
+            // Опційно доповнимо ім'я, якщо його ще не було
+            if (name) {
+              try { await supabase.from('leads').update({ name }).eq('id', best.id); } catch {}
+            }
+            return { success: true, data: { adopted: true as const, chatId: foundChatId } };
+          }
+        }
+      }
+    } catch (e) {
+      // Не критично – продовжимо зі створенням/оновленням ліда для поточного чату
+      console.error('match lead by contact failed:', e);
+    }
+
+    // 2) Якщо нічого не знайшли — звична поведінка: створити/оновити лід у поточному чаті
+    await upsertLead({ chatId: currentChatId, ...detected, name, locale: input.locale, firstMessage: input.contact, source: 'chat' });
+    return { success: true, data: { adopted: false as const, chatId: currentChatId } };
   } catch (e) {
     const err = e instanceof Error ? e : new Error(String(e));
     return { success: false, error: err.message };
@@ -536,10 +580,52 @@ export async function submitChatFeedback(rating: 'up' | 'down') {
     const supabase = getSupabaseClient();
     const chatId = await getOrCreateChatId();
     const value = rating === 'up' ? 5 : 1;
-    const { error } = await supabase
+
+    // Upsert feedback so один чат має одну оцінку
+    let upsertOk = false;
+    const { error: upsertErr } = await supabase
       .from('chat_feedback')
-      .insert({ chat_id: chatId, rating: value });
-    if (error) return { success: false, error: error.message };
+      .upsert({ chat_id: chatId, rating: value }, { onConflict: 'chat_id' });
+    if (!upsertErr) {
+      upsertOk = true;
+    } else {
+      // Fallback path: handle cases when unique constraint or update policy is missing in prod
+      try {
+        const { data: existingArr, error: selErr } = await supabase
+          .from('chat_feedback')
+          .select('id')
+          .eq('chat_id', chatId)
+          .order('id', { ascending: false })
+          .limit(1);
+        const existing = Array.isArray(existingArr) && existingArr.length > 0 ? existingArr[0] : null;
+        if (!selErr && existing?.id) {
+          const { error: updErr } = await supabase
+            .from('chat_feedback')
+            .update({ rating: value })
+            .eq('id', existing.id);
+          if (!updErr) upsertOk = true;
+        } else {
+          const { error: insErr } = await supabase
+            .from('chat_feedback')
+            .insert({ chat_id: chatId, rating: value });
+          if (!insErr) upsertOk = true;
+        }
+      } catch (e) {
+        // fall through with error
+      }
+    }
+    if (!upsertOk) return { success: false, error: upsertErr?.message || 'Failed to save feedback' };
+
+    // Запишемо маркер у стрічку повідомлень, щоб було видно в історії
+    const marker = rating === 'up' ? '::feedback_up::' : '::feedback_down::';
+    const { error: msgErr } = await supabase
+      .from('messages')
+      .insert({ chat_id: chatId, role: 'assistant', content: marker });
+    if (msgErr) {
+      // Не критично: лог і продовжуємо
+      console.error('Insert feedback marker error:', msgErr);
+    }
+
     await notifyTelegram(`⭐️ Оцінка чату: ${rating === 'up' ? '👍' : '👎'}\nchat_id: ${chatId}`);
     return { success: true };
   } catch (e) {

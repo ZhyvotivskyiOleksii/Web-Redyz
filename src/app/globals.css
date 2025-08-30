@@ -120,14 +120,30 @@ body {
     }
 
     .chat-widget-container {
-        @apply fixed inset-0 z-50 flex flex-col items-center justify-center p-0 sm:p-4;
+        @apply fixed inset-0 z-50 flex flex-col items-end justify-end p-0 sm:p-4;
+        /* Prevent background page scroll/bounce while chat is open */
+        overscroll-behavior: none;
+        /* Make sure overlay itself occupies viewport height on iOS */
+        height: 100dvh;
+        /* Block gestures outside the scrollable area by default */
+        touch-action: none;
+        background: hsl(var(--background));
     }
-    
+
+    /* Ensure inner viewport allows vertical pan for chat content */
+    .chat-widget-container [data-radix-scroll-area-viewport] {
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
+      overscroll-behavior: contain;
+    }
+
     @media (min-width: 640px) {
       .chat-widget-container {
-        @apply items-end justify-end;
+        background: transparent;
       }
     }
+    
+    /* On small screens we already bottom-align it */
     
     .chat-widget-card,
     .chat-widget-card-menu {

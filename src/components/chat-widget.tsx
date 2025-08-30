@@ -33,7 +33,7 @@ type ChatMessage = {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
-  type?: 'text' | 'contact_form' | 'idle_prompt' | 'rating_prompt' | 'secure_confirm';
+  type?: 'text' | 'contact_form' | 'idle_prompt' | 'rating_prompt' | 'secure_confirm' | 'more_help_prompt';
   lang?: 'ua' | 'ru' | 'pl' | 'de' | 'en';
 };
 
@@ -92,7 +92,7 @@ const MenuContent = forwardRef<HTMLDivElement, { onNavigate: (view: View) => voi
       className="chat-widget-card-menu"
       onClick={(e) => e.stopPropagation()}
     >
-      <Card className="w-full h-full flex flex-col shadow-2xl border bg-card/80 backdrop-blur-lg overflow-hidden sm:rounded-xl">
+      <Card className="w-full h-full flex flex-col shadow-2xl border bg-card overflow-hidden sm:bg-card/80 sm:backdrop-blur-lg sm:rounded-xl">
         <div className="menu-header p-5">
           <div className="flex justify-between items-center mb-1">
             <h3 className="font-bold text-xl text-white">{t.chatMenuTitle}</h3>
@@ -208,7 +208,7 @@ const isEmojiOnly = (s: string) => {
   return Array.from(cleaned).length <= 5;
 };
 
-const ChatContent = forwardRef<HTMLDivElement, { onNavigate: (view: View) => void, onClose: () => void, onAssistantMessage?: (p: { content: string }) => void, onUserSend?: () => void }>(({ onNavigate, onClose, onAssistantMessage, onUserSend }, ref) => {
+const ChatContent = forwardRef<HTMLDivElement, { onNavigate: (view: View) => void, onClose: () => void, onAssistantMessage?: (p: { content: string }) => void, onUserSend?: () => void, keyboardOffset?: number }>(({ onNavigate, onClose, onAssistantMessage, onUserSend, keyboardOffset = 0 }, ref) => {
   const params = useParams();
   const locale = Array.isArray(params.locale) ? params.locale[0] : params.locale as string;
   const t = (translations as any)[locale] || translations.ua;
@@ -231,6 +231,63 @@ const ChatContent = forwardRef<HTMLDivElement, { onNavigate: (view: View) => voi
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
+  
+  // Cross-device adoption: if URL contains ?chat=<id> (or ?c=<id>), adopt that session
+  useEffect(() => {
+    (async () => {
+      try {
+        if (typeof window === 'undefined') return;
+        const url = new URL(window.location.href);
+        const urlChat = url.searchParams.get('chat') || url.searchParams.get('c');
+        if (urlChat && /^[0-9a-fA-F-]{10,}$/.test(urlChat)) {
+          try {
+            const res = await adoptChatSession(urlChat);
+            if (res?.success) {
+              try { localStorage.setItem('web_impuls_chat_id', urlChat); } catch {}
+              setChatId(urlChat);
+              // Clean URL (remove chat param) to avoid re-adoption on refresh
+              url.searchParams.delete('chat');
+              url.searchParams.delete('c');
+              const clean = url.pathname + (url.searchParams.toString() ? `?${url.searchParams.toString()}` : '') + url.hash;
+              window.history.replaceState({}, '', clean);
+
+              // Refresh lead status and history immediately for adopted chat
+              try {
+                const s = await getLeadStatus();
+                if (s?.success && s.data) {
+                  setHasLead(s.data.hasLead);
+                  setLeadEmail(s.data.email || null);
+                  setLeadPhone(s.data.phone || null);
+                }
+              } catch {}
+              try {
+                const resH = await getChatHistory(locale as any);
+                if (resH?.success && resH.data) {
+                  const rows: any[] = resH.data.messages || [];
+                  const history: ChatMessage[] = [];
+                  for (const row of rows) {
+                    if (row.role === 'assistant' && row.content === '::contact_form::') {
+                      const lastUser = [...history].reverse().find((x) => x.role === 'user');
+                      const inferred = lastUser ? detectMessageLocale(lastUser.content, (locale as any) || 'ua') : (locale as any);
+                      for (let i = history.length - 1; i >= 0; i--) {
+                        const h = history[i] as any;
+                        if (h.type === 'contact_form' || (h.role === 'assistant' && h.content === '::contact_form::')) history.splice(i, 1);
+                      }
+                      history.push({ role: 'assistant', content: '', type: 'contact_form', lang: inferred as any, timestamp: new Date(row.created_at).toISOString() });
+                      continue;
+                    }
+                    history.push({ role: row.role as 'user' | 'assistant', content: row.content, timestamp: new Date(row.created_at).toISOString() });
+                  }
+                  if (history.length > 0) setMessages(history);
+                  setHistoryLoaded(true);
+                }
+              } catch {}
+            }
+          } catch {}
+        }
+      } catch {}
+    })();
+  }, []);
   const sendQuick = (text: string) => {
     try { onUserSend?.(); } catch {}
     setInput(text);
@@ -251,6 +308,8 @@ const ChatContent = forwardRef<HTMLDivElement, { onNavigate: (view: View) => voi
       textareaRef.current?.focus();
     }
   }, [messages, isLoading]);
+
+  // Removed additional scrollIntoView on focus to avoid extra jumps on iOS
 
   // Load persisted history on mount (fast path with cache, avoid creating chat needlessly)
   useEffect(() => {
@@ -537,14 +596,14 @@ const ChatContent = forwardRef<HTMLDivElement, { onNavigate: (view: View) => voi
         };
         setMessages(prev => {
           const next = addUniqueMessage(prev, assistantMessage);
-          // If assistant provided direct contact links, append rating prompt once
+          // If assistant provided direct contact links, append soft follow-up (not rating yet)
           try {
             const txt = assistantMessage.content || '';
             const hasLinks = /t\.me\/|viber:\/\/chat\?number=|m\.me\//i.test(txt);
-            const already = next.some((m) => (m as any).type === 'rating_prompt');
+            const already = next.some((m) => (m as any).type === 'more_help_prompt');
             if (hasLinks && !already && !ratingAfterContactShownRef.current) {
               ratingAfterContactShownRef.current = true;
-              return [...next, { role: 'assistant', content: '', type: 'rating_prompt', timestamp: new Date().toISOString() } as ChatMessage];
+              return [...next, { role: 'assistant', content: '', type: 'more_help_prompt', timestamp: new Date().toISOString() } as ChatMessage];
             }
           } catch {}
           return next;
@@ -628,6 +687,37 @@ const ChatContent = forwardRef<HTMLDivElement, { onNavigate: (view: View) => voi
       const { saveLeadDetails } = await import('@/app/actions');
       const res = await saveLeadDetails({ name: nameValue, contact: contactValue, locale: preferredLang || (locale as any) });
       if (res.success) {
+        // Якщо сесію прийнято за збігом e‑mail/телефону — оновимо локальні стани та підтягнемо історію
+        if ((res as any).data?.adopted && (res as any).data?.chatId) {
+          try {
+            const adoptedId = (res as any).data.chatId as string;
+            setChatId(adoptedId);
+            try { localStorage.setItem('web_impuls_chat_id', adoptedId); } catch {}
+            const { getChatHistory } = await import('@/app/actions');
+            const h = await getChatHistory(locale);
+            if (h.success && h.data) {
+              const rows: any[] = h.data.messages || [];
+              const history: ChatMessage[] = [];
+              for (const row of rows) {
+                if (row.role === 'assistant' && row.content === '::contact_form::') {
+                  const lastUser = [...history].reverse().find((x) => x.role === 'user');
+                  const inferred = lastUser ? detectMessageLocale(lastUser.content, (locale as any) || 'ua') : (locale as any);
+                  for (let i = history.length - 1; i >= 0; i--) {
+                    const h = history[i] as any;
+                    if (h.type === 'contact_form' || (h.role === 'assistant' && h.content === '::contact_form::')) history.splice(i, 1);
+                  }
+                  history.push({ role: 'assistant', content: '', type: 'contact_form', lang: inferred as any, timestamp: new Date(row.created_at).toISOString() });
+                  continue;
+                }
+                history.push({ role: row.role as 'user' | 'assistant', content: row.content, timestamp: new Date(row.created_at).toISOString() });
+              }
+              if (history.length > 0) setMessages(history);
+              setHistoryLoaded(true);
+            }
+          } catch (e) {
+            console.error('adopt history load failed', e);
+          }
+        }
         setContactValue('');
         setNameValue('');
         toast({
@@ -659,34 +749,35 @@ const ChatContent = forwardRef<HTMLDivElement, { onNavigate: (view: View) => voi
         if (!v.includes('@')) setLeadPhone(v);
         // Прибираємо форму і додаємо підтвердження у стрічку (картка з щитом)
         setMessages(prev => prev.filter(m => m.type !== 'contact_form'));
-        const confirmMsg: ChatMessage = { role: 'assistant', content: '', type: 'secure_confirm', timestamp: new Date().toISOString(), lang: preferredLang || (locale as any) };
-        // Персоналізоване вітання після підтвердження
-        const firstName = (nameValue || '').trim().split(/\s+/)[0] || '';
-        const langForHello = preferredLang || (locale as any);
-        const helloText = firstName
-          ? (langForHello === 'de'
-              ? `Hallo ${firstName}! Wie kann ich helfen?`
-              : langForHello === 'en'
-              ? `Hi ${firstName}! How can I help?`
-              : langForHello === 'pl'
-              ? `Cześć, ${firstName}! W czym mogę pomóc?`
-              : langForHello === 'ru'
-              ? `Привет, ${firstName}! Чем могу помочь?`
-              : `Привіт, ${firstName}! Чим можу допомогти?`)
-          : (langForHello === 'de'
-              ? 'Hallo! Wie kann ich helfen?'
-              : langForHello === 'en'
-              ? 'Hi! How can I help?'
-              : langForHello === 'pl'
-              ? 'Cześć! W czym mogę pomóc?'
-              : langForHello === 'ru'
-              ? 'Привет! Чем могу помочь?'
-              : 'Привіт! Чим можу допомогти?');
-        const helloMsg: ChatMessage = { role: 'assistant', content: helloText, timestamp: new Date().toISOString() };
-
-        setMessages(prev => addUniqueMessage(addUniqueMessage(prev.filter(m => m.type !== 'contact_form' && m.content !== '::contact_form::'), confirmMsg), helloMsg));
-        try { onAssistantMessage?.({ content: 'secure_confirm' }); } catch {}
-        try { onAssistantMessage?.({ content: helloText }); } catch {}
+        // Якщо НЕ було adoption — додамо локальне підтвердження+вітання; при adoption історію вже підтягуємо
+        if (!((res as any).data?.adopted)) {
+          const confirmMsg: ChatMessage = { role: 'assistant', content: '', type: 'secure_confirm', timestamp: new Date().toISOString(), lang: preferredLang || (locale as any) };
+          const firstName = (nameValue || '').trim().split(/\s+/)[0] || '';
+          const langForHello = preferredLang || (locale as any);
+          const helloText = firstName
+            ? (langForHello === 'de'
+                ? `Hallo ${firstName}! Wie kann ich helfen?`
+                : langForHello === 'en'
+                ? `Hi ${firstName}! How can I help?`
+                : langForHello === 'pl'
+                ? `Cześć, ${firstName}! W czym mogę pomóc?`
+                : langForHello === 'ru'
+                ? `Привет, ${firstName}! Чем могу помочь?`
+                : `Привіт, ${firstName}! Чим можу допомогти?`)
+            : (langForHello === 'de'
+                ? 'Hallo! Wie kann ich helfen?'
+                : langForHello === 'en'
+                ? 'Hi! How can I help?'
+                : langForHello === 'pl'
+                ? 'Cześć! W czym mogę pomóc?'
+                : langForHello === 'ru'
+                ? 'Привет! Чем могу помочь?'
+                : 'Привіт! Чим можу допомогти?');
+          const helloMsg: ChatMessage = { role: 'assistant', content: helloText, timestamp: new Date().toISOString() };
+          setMessages(prev => addUniqueMessage(addUniqueMessage(prev, confirmMsg), helloMsg));
+          try { onAssistantMessage?.({ content: 'secure_confirm' }); } catch {}
+          try { onAssistantMessage?.({ content: helloText }); } catch {}
+        }
       } else {
         toast({
           variant: 'destructive',
@@ -752,7 +843,7 @@ const ChatContent = forwardRef<HTMLDivElement, { onNavigate: (view: View) => voi
     );
   };
 
-  // Inject rating prompt after assistant shares direct contact links
+  // Inject follow-up prompt after assistant shares direct contact links
   useEffect(() => {
     try {
       if (ratingAfterContactShownRef.current) return;
@@ -761,10 +852,10 @@ const ChatContent = forwardRef<HTMLDivElement, { onNavigate: (view: View) => voi
       const { m, i } = lastAssistIdx;
       if (!m || !m.content) return;
       if (!hasContactLinks(m.content)) return;
-      const hasRatingAfter = messages.slice(i + 1).some((mm:any) => mm.type === 'rating_prompt');
-      if (hasRatingAfter) return;
+      const hasFollowUp = messages.slice(i + 1).some((mm:any) => mm.type === 'more_help_prompt');
+      if (hasFollowUp) return;
       ratingAfterContactShownRef.current = true;
-      setMessages(prev => [...prev, { role: 'assistant', content: '', type: 'rating_prompt', timestamp: new Date().toISOString() }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: '', type: 'more_help_prompt', timestamp: new Date().toISOString() }]);
     } catch {}
   }, [messages]);
 
@@ -815,7 +906,7 @@ const ChatContent = forwardRef<HTMLDivElement, { onNavigate: (view: View) => voi
       className="chat-widget-card relative"
       onClick={(e) => e.stopPropagation()}
     >
-      <Card className="w-full h-full flex flex-col shadow-lg border bg-card/80 backdrop-blur-lg overflow-hidden sm:rounded-xl">
+      <Card className="w-full h-full flex flex-col shadow-lg border bg-card overflow-hidden sm:bg-card/80 sm:backdrop-blur-lg sm:rounded-xl">
         <CardHeader className="flex flex-row items-center justify-between p-4 bg-primary text-primary-foreground">
           <div className="flex items-center gap-3">
              <Button
@@ -862,7 +953,34 @@ const ChatContent = forwardRef<HTMLDivElement, { onNavigate: (view: View) => voi
                   <MoreVertical className="h-5 w-5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="z-[10001] rounded-lg border bg-card text-card-foreground p-1 shadow-xl min-w-[220px]">
+            <DropdownMenuContent align="end" className="z-[10001] rounded-lg border bg-card text-card-foreground p-1 shadow-xl min-w-[220px]">
+                <DropdownMenuItem className="rounded-md px-3 py-2 focus:bg-muted" onClick={async () => {
+                  try {
+                    let id = chatId;
+                    if (!id) {
+                      const { getChatSession } = await import('@/app/actions');
+                      const s = await getChatSession();
+                      if (s.success && s.data?.chatId) {
+                        id = s.data.chatId;
+                        setChatId(id);
+                        try { localStorage.setItem('web_impuls_chat_id', id); } catch {}
+                      }
+                    }
+                    if (!id) {
+                      toast({ variant: 'destructive', title: t.errorTitle, description: (locale === 'de') ? 'Konnte Chat-ID nicht abrufen' : (locale === 'en') ? 'Failed to obtain chat ID' : (locale === 'pl') ? 'Nie udało się uzyskać identyfikatora czatu' : (locale === 'ru') ? 'Не удалось получить chat id' : 'Не вдалося отримати chat id' });
+                      return;
+                    }
+                    const u = new URL(window.location.href);
+                    u.searchParams.set('chat', id);
+                    await navigator.clipboard.writeText(u.toString());
+                    toast({ title: (locale === 'de') ? 'Link kopiert' : (locale === 'en') ? 'Link copied' : (locale === 'pl') ? 'Link skopiowany' : (locale === 'ru') ? 'Ссылка скопирована' : 'Посилання скопійовано' });
+                  } catch (e) {
+                    console.error(e);
+                    toast({ variant: 'destructive', title: t.errorTitle, description: (locale === 'de') ? 'Fehler beim Kopieren des Links' : (locale === 'en') ? 'Error copying link' : (locale === 'pl') ? 'Błąd kopiowania linku' : (locale === 'ru') ? 'Ошибка копирования ссылки' : 'Помилка копіювання посилання' });
+                  }
+                }}>
+                  {locale === 'de' ? 'Link zum Chat kopieren' : locale === 'en' ? 'Copy chat link' : locale === 'pl' ? 'Kopiuj link do czatu' : locale === 'ru' ? 'Скопировать ссылку на чат' : 'Скопіювати посилання на чат'}
+                </DropdownMenuItem>
                 <DropdownMenuItem className="rounded-md px-3 py-2 focus:bg-muted" onClick={async () => {
                   try {
                     const { resetChatSession, getChatHistory } = await import('@/app/actions');
@@ -989,6 +1107,7 @@ const ChatContent = forwardRef<HTMLDivElement, { onNavigate: (view: View) => voi
                 const prevMsg = (displayMessages as any)[index - 1] as ChatMessage | undefined;
                 let msgLocale = ((message as any).lang as any) || (locale as any);
                 const isContactForm = (message.type === 'contact_form' || (message.role === 'assistant' && message.content === '::contact_form::')) && !hasLead;
+                const isFeedbackMarker = (message.role === 'assistant' && (message.content === '::feedback_up::' || message.content === '::feedback_down::'));
                 // If contact form came from DB marker, infer language from previous user message
                 if (!((message as any).lang) && message.role === 'assistant' && message.content === '::contact_form::' && prevMsg && prevMsg.role === 'user') {
                   try { msgLocale = detectMessageLocale(prevMsg.content, (locale as any) || 'ua'); } catch {}
@@ -1007,6 +1126,7 @@ const ChatContent = forwardRef<HTMLDivElement, { onNavigate: (view: View) => voi
                     : 'Бажаєте продовжити?';
                 const isIdlePrompt = false; // idle prompts disabled
                 const isRatingPrompt = message.type === 'rating_prompt';
+                const isMoreHelpPrompt = message.type === 'more_help_prompt';
                 return (
                   <motion.div
                     key={index}
@@ -1127,6 +1247,29 @@ const ChatContent = forwardRef<HTMLDivElement, { onNavigate: (view: View) => voi
                                 : 'Ваші дані надійно зашифровані.'}
                             </div>
                           </div>
+                        ) : isFeedbackMarker ? (
+                          <div className="max-w-[80%] rounded-lg bg-muted p-3 text-sm w-full">
+                            <div className="flex items-center gap-2">
+                              <span className="text-base">{message.content === '::feedback_up::' ? '👍' : '👎'}</span>
+                              <span className="text-sm text-muted-foreground">
+                                {locale === 'de' ? 'Feedback gespeichert' : locale === 'en' ? 'Feedback saved' : locale === 'pl' ? 'Opinia zapisana' : locale === 'ru' ? 'Оценка сохранена' : 'Оцінку збережено'}
+                              </span>
+                            </div>
+                          </div>
+                        ) : isMoreHelpPrompt ? (
+                          <div className="max-w-[80%] rounded-lg bg-muted p-3 text-sm w-full">
+                            <div className="mb-2">
+                              {locale === 'de' ? 'Kann ich noch etwas helfen?' : locale === 'en' ? 'Can I help with anything else?' : locale === 'pl' ? 'Czy mogę jeszcze w czymś pomóc?' : locale === 'ru' ? 'Могу ещё чем-то помочь?' : 'Чим ще можу допомогти?'}
+                            </div>
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={() => {
+                                try { textareaRef.current?.focus(); } catch {}
+                              }}>{locale === 'de' ? 'Ja' : locale === 'en' ? 'Yes' : locale === 'pl' ? 'Tak' : locale === 'ru' ? 'Да' : 'Так'}</Button>
+                              <Button size="sm" variant="secondary" onClick={() => {
+                                setMessages((prev) => [...prev, { role: 'assistant', content: '', type: 'rating_prompt', timestamp: new Date().toISOString() } as ChatMessage]);
+                              }}>{locale === 'de' ? 'Nein' : locale === 'en' ? 'No' : locale === 'pl' ? 'Nie' : locale === 'ru' ? 'Нет' : 'Ні'}</Button>
+                            </div>
+                          </div>
                         ) : isRatingPrompt ? (
                           <div className="max-w-[80%] rounded-lg bg-muted p-3 text-sm w-full">
                             <div className="mb-2">
@@ -1136,28 +1279,39 @@ const ChatContent = forwardRef<HTMLDivElement, { onNavigate: (view: View) => voi
                               <Button size="sm" onClick={async () => {
                                 try {
                                   const { submitChatFeedback, insertAssistantMessage } = await import('@/app/actions');
-                                  await submitChatFeedback('up');
+                                  const r = await submitChatFeedback('up');
+                                  if (!r?.success) {
+                                    toast({ variant: 'destructive', title: t.errorTitle, description: r?.error || 'Не вдалося зберегти оцінку.' });
+                                  }
+                                  // локально додамо маркер, щоб одразу було видно в стрічці
+                                  setMessages((prev) => addUniqueMessage(prev, { role: 'assistant', content: '::feedback_up::', timestamp: new Date().toISOString() }));
                                   const cta = locale === 'de'
                                     ? 'Danke für Ihr Feedback! Wenn es passt — kontaktieren Sie uns über: Telegram https://t.me/oleksiy_zhyvotivskyi | Viber viber://chat?number=%2B48512686628 | Messenger https://m.me/61559794323482'
                                     : locale === 'en'
                                     ? 'Thanks for your feedback! If convenient, contact us via: Telegram https://t.me/oleksiy_zhyvotivskyi | Viber viber://chat?number=%2B48512686628 | Messenger https://m.me/61559794323482'
                                     : 'Дякуємо за оцінку! Якщо зручно — звʼяжіться з нами у: Telegram https://t.me/oleksiy_zhyvotivskyi | Viber viber://chat?number=%2B48512686628 | Messenger https://m.me/61559794323482';
                                   await insertAssistantMessage(cta);
-                                } catch {}
-                                onClose();
+                                } catch (e) {
+                                  console.error(e);
+                                }
                               }}>👍🏻</Button>
                               <Button size="sm" variant="secondary" onClick={async () => {
                                 try {
                                   const { submitChatFeedback, insertAssistantMessage } = await import('@/app/actions');
-                                  await submitChatFeedback('down');
+                                  const r = await submitChatFeedback('down');
+                                  if (!r?.success) {
+                                    toast({ variant: 'destructive', title: t.errorTitle, description: r?.error || 'Не вдалося зберегти оцінку.' });
+                                  }
+                                  setMessages((prev) => addUniqueMessage(prev, { role: 'assistant', content: '::feedback_down::', timestamp: new Date().toISOString() }));
                                   const cta = locale === 'de'
                                     ? 'Danke! Wenn Sie uns brauchen — wir sind erreichbar: Telegram https://t.me/oleksiy_zhyvotivskyi | Viber viber://chat?number=%2B48512686628 | Messenger https://m.me/61559794323482'
                                     : locale === 'en'
                                     ? 'Thanks! If you need us, reach out: Telegram https://t.me/oleksiy_zhyvotivskyi | Viber viber://chat?number=%2B48512686628 | Messenger https://m.me/61559794323482'
                                     : 'Дякуємо! Якщо що — ми на звʼязку: Telegram https://t.me/oleksiy_zhyvotivskyi | Viber viber://chat?number=%2B48512686628 | Messenger https://m.me/61559794323482';
                                   await insertAssistantMessage(cta);
-                                } catch {}
-                                onClose();
+                                } catch (e) {
+                                  console.error(e);
+                                }
                               }}>👎🏻</Button>
                             </div>
                           </div>
@@ -1215,7 +1369,10 @@ const ChatContent = forwardRef<HTMLDivElement, { onNavigate: (view: View) => voi
           </ScrollArea>
         </CardContent>
 
-        <CardFooter className="p-4 flex flex-col gap-2 border-t">
+        <CardFooter
+          className="p-4 flex flex-col gap-2 border-t"
+          style={{ paddingBottom: `calc(max(env(safe-area-inset-bottom), 1rem) + ${Math.max(0, keyboardOffset)}px)` }}
+        >
           <div className="relative w-full">
             {emojiOpen && (
               <div className="absolute left-0 right-0 bottom-full mb-2 z-20">
@@ -1289,6 +1446,9 @@ export function ChatWidget() {
   const [portalNode, setPortalNode] = useState<HTMLElement | null>(null);
   const [sessionChatId, setSessionChatId] = useState<string | null>(null);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
+  // Mobile keyboard offset (iOS visualViewport)
+  const [kbOffset, setKbOffset] = useState(0);
+  const [containerHeightPx, setContainerHeightPx] = useState<number | null>(null);
 
   const params = useParams();
   const locale = Array.isArray((params as any).locale) ? (params as any).locale[0] : (params as any).locale;
@@ -1365,6 +1525,76 @@ export function ChatWidget() {
       try { document.body.removeChild(el); } catch {}
     };
   }, []);
+
+  // Strong body scroll-lock while widget is open (iOS-safe)
+  const scrollLockRef = useRef(0);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const { body } = document;
+    if (view !== 'closed') {
+      // store current scroll position and lock
+      scrollLockRef.current = window.scrollY || window.pageYOffset || 0;
+      body.style.position = 'fixed';
+      body.style.top = `-${scrollLockRef.current}px`;
+      body.style.left = '0';
+      body.style.right = '0';
+      body.style.width = '100%';
+      body.style.overflow = 'hidden';
+    } else {
+      // restore
+      const top = body.style.top;
+      body.style.position = '';
+      body.style.top = '';
+      body.style.left = '';
+      body.style.right = '';
+      body.style.width = '';
+      body.style.overflow = '';
+      const y = top ? Math.abs(parseInt(top, 10) || 0) : scrollLockRef.current;
+      window.scrollTo(0, y);
+    }
+    return () => {
+      // Ensure unlock on unmount
+      const top = body.style.top;
+      body.style.position = '';
+      body.style.top = '';
+      body.style.left = '';
+      body.style.right = '';
+      body.style.width = '';
+      body.style.overflow = '';
+      const y = top ? Math.abs(parseInt(top, 10) || 0) : scrollLockRef.current;
+      if (view !== 'closed') window.scrollTo(0, y);
+    };
+  }, [view]);
+
+  // Track iOS keyboard with visualViewport and add safe bottom padding so input stays visible
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const vv = (window as any).visualViewport as VisualViewport | undefined;
+    if (!vv) return;
+    const onResize = () => {
+      try {
+        const diff = Math.max(0, window.innerHeight - vv.height);
+        setKbOffset(diff > 0 ? Math.ceil(diff) : 0);
+        setContainerHeightPx(Math.round(vv.height));
+      } catch {
+        setKbOffset(0);
+        setContainerHeightPx(null);
+      }
+    };
+    if (view !== 'closed') {
+      vv.addEventListener('resize', onResize);
+      vv.addEventListener('scroll', onResize);
+      onResize();
+    }
+    return () => {
+      try {
+        vv.removeEventListener('resize', onResize);
+        vv.removeEventListener('scroll', onResize);
+      } catch {}
+      setKbOffset(0);
+      setContainerHeightPx(null);
+    };
+  }, [view]);
 
   // Відкриваємо віджет у режимі меню (лічильник не обнуляємо)
   const openWidget = () => {
@@ -1637,19 +1867,61 @@ export function ChatWidget() {
   // Use portal if available; render nothing until mount to avoid shifting
   if (!portalNode) return null;
 
+  const isInsideScrollable = (el: EventTarget | null) => {
+    try {
+      return !!(el as Element | null)?.closest('[data-radix-scroll-area-viewport]');
+    } catch {
+      return false;
+    }
+  };
+  const handleOverlayTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!isInsideScrollable(e.target)) {
+      e.preventDefault();
+    }
+  };
+  const handleOverlayWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (!isInsideScrollable(e.target)) {
+      e.preventDefault();
+    }
+  };
+
   return (
     <>
       {createPortal(
         shouldRenderContent ? (
-          <div className="chat-widget-container z-[9999]" onClick={handleContainerClick}>
-            <AnimatePresence>
-            {view === 'menu' && <MenuContent unread={unread} onNavigate={(v) => { setView(v); if (v === 'chat') setUnread(0); }} onClose={closeWidget} />}
-            {view === 'chat' && <ChatContent onNavigate={(v) => { setView(v); if (v === 'chat') setUnread(0); }} onClose={closeWidget} onAssistantMessage={handleAssistantMessage} onUserSend={handleUserSend} />}
-          </AnimatePresence>
-        </div>
-      ) : null,
-      portalNode
-    )}
+          <div
+            className="chat-widget-container z-[9999]"
+            onClick={handleContainerClick}
+            onTouchMoveCapture={handleOverlayTouchMove}
+            onWheelCapture={handleOverlayWheel}
+          >
+            <div
+              className="w-full h-full flex items-end justify-end"
+              style={{ height: '100dvh' }}
+            >
+              <AnimatePresence>
+                {view === 'menu' && (
+                  <MenuContent
+                    unread={unread}
+                    onNavigate={(v) => { setView(v); if (v === 'chat') setUnread(0); }}
+                    onClose={closeWidget}
+                  />
+                )}
+                {view === 'chat' && (
+                  <ChatContent
+                    onNavigate={(v) => { setView(v); if (v === 'chat') setUnread(0); }}
+                    onClose={closeWidget}
+                    onAssistantMessage={handleAssistantMessage}
+                    onUserSend={handleUserSend}
+                    keyboardOffset={kbOffset}
+                  />
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        ) : null,
+        portalNode
+      )}
 
       {createPortal(
         (
