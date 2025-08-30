@@ -18,7 +18,8 @@ const WebImpulsChatInputSchema = z.object({
       role: z.enum(['user', 'assistant']),
       content: z.string(),
   })).describe('The history of the conversation so far.'),
-  locale: z.string().optional().describe('UI locale (ru/ua/en).'),
+  locale: z.string().optional().describe('UI locale (ua/pl/en/de).'),
+  customerName: z.string().optional().describe('Customer\'s name if known.'),
 });
 export type WebImpulsChatInput = z.infer<typeof WebImpulsChatInputSchema>;
 
@@ -157,43 +158,43 @@ Services & Pricing (English):
 - Timeframe: Response up to 24 hours.
 - What's included: 24/7 website monitoring, content updates, backups, bug fixes, security updates, monthly reports.
 
-Services & Pricing (Russian):
+Services & Pricing (German):
 
-1. Лендинг:
-- Описание: Продающая страница.
-- Цена: $800 - $1,500 (Стоимость зависит от сложности).
-- Срок: 5-7 дней.
-- Что входит: Адаптивный дизайн, современные анимации, SEO-оптимизация, интеграция с аналитикой, форма обратной связи, загрузка за 1-2 секунды.
+1. Landing Page:
+- Beschreibung: Verkaufsseite.
+- Preis: $800 - $1,500 (Die Kosten hängen von der Komplexität ab).
+- Zeitrahmen: 5-7 Tage.
+- Was ist inbegriffen: Responsives Design, moderne Animationen, SEO-Optimierung, Analyse-Integration, Kontaktformular, Ladezeit von 1-2 Sekunden.
 
-2. Корпоративный сайт (Самое популярное):
-- Описание: Представительский сайт для бизнеса.
-- Цена: $2,500 - $5,000 (В зависимости от количества страниц).
-- Срок: 14-21 день.
-- Что входит: Многостраничная структура, админ-панель для контента, блог/новости, галерея проектов, контакты и карты, многоязычность.
+2. Unternehmenswebsite (Am beliebtesten):
+- Beschreibung: Repräsentative Website für Unternehmen.
+- Preis: $2,500 - $5,000 (Abhängig von der Anzahl der Seiten).
+- Zeitrahmen: 14-21 Tage.
+- Was ist inbegriffen: Mehrseitige Struktur, Admin-Panel zur Inhaltsverwaltung, Blog/News, Projektgalerie, Kontaktformulare und Karten, Mehrsprachigkeit.
 
-3. Интернет-магазин:
-- Описание: Полноценное e-commerce решение.
-- Цена: $4,000 - $8,000 (Базовая версия - продвинутая).
-- Срок: 21-35 дней.
-- Что входит: Каталог товаров с фильтрами, корзина и система заказов, интеграция платежей, личный кабинет, админ-панель, система скидок.
+3. E-Commerce-Shop:
+- Beschreibung: Vollwertige E-Commerce-Lösung.
+- Preis: $4,000 - $8,000 (Basis- bis erweiterte Version).
+- Zeitrahmen: 21-35 Tage.
+- Was ist inbegriffen: Produktkatalog mit Filtern, Warenkorb- und Bestellsystem, Zahlungsgateway-Integration, Benutzerkontobereich, Admin-Verwaltungspanel, Rabattsystem.
 
-4. Веб-приложение (SaaS/PWA):
-- Описание: SaaS/PWA решение.
-- Цена: $8,000 - $15,000 (MVP - полнофункциональное).
-- Срок: 45-60 дней.
-- Что входит: Система авторизации, дашборд с аналитикой, API для интеграций, real-time обновления, файловое хранилище, push-уведомления.
+4. Webanwendung (SaaS/PWA):
+- Beschreibung: SaaS/PWA-Lösung.
+- Preis: $8,000 - $15,000 (MVP bis voll funktionsfähig).
+- Zeitrahmen: 45-60 Tage.
+- Was ist inbegriffen: Authentifizierungssystem, Analyse-Dashboard, API für Integrationen, Echtzeit-Updates, Dateispeicher, Push-Benachrichtigungen.
 
-5. Редизайн сайта:
-- Описание: Обновление дизайна и модернизация.
-- Цена: $1,500 - $4,000 (В зависимости от объёма работ).
-- Срок: 10-21 день.
-- Что входит: Современный UI/UX, миграция на новые технологии, оптимизация производительности, улучшение SEO, адаптация под мобильные.
+5. Website-Neugestaltung:
+- Beschreibung: Design-Auffrischung und Modernisierung.
+- Preis: $1,500 - $4,000 (Abhängig vom Arbeitsumfang).
+- Zeitrahmen: 10-21 Tage.
+- Was ist inbegriffen: Modernes UI/UX-Design, Migration auf neue Technologien, Leistungsoptimierung, SEO-Verbesserung, mobile Anpassung.
 
-6. Поддержка сайта:
-- Описание: Техническая поддержка и развитие.
-- Цена: $300 - $800/месяц (Базовый - расширенный пакет).
-- Срок: Ответ до 24 часов.
-- Что входит: 24/7 мониторинг, обновление контента, резервные копии, исправление ошибок, обновления безопасности, ежемесячные отчеты.
+6. Website-Support:
+- Beschreibung: Technischer Support und Entwicklung.
+- Preis: $300 - $800/Monat (Basis- bis erweitertes Paket).
+- Zeitrahmen: Antwort innerhalb von 24 Stunden.
+- Was ist inbegriffen: 24/7-Website-Überwachung, Inhaltsaktualisierungen, Backups, Fehlerbehebungen, Sicherheitsupdates, monatliche Berichte.
 
 Contact Info:
 - Telegram: https://t.me/oleksiy_zhyvotivskyi
@@ -218,17 +219,29 @@ Sales style (succinct, helpful, consultative, not pushy):
 - Recommend 1 primary offer and optionally 1 alternative (cheaper or more advanced), with bullet points for scope, timeline and price ranges from knowledge.
 - Only suggest leaving contacts after the user shows readiness (e.g., asks about next steps) or after several exchanges when it feels natural. Be polite and optional.
 - Keep tone warm, respectful, and professional. Avoid sounding like you are insisting or rushing.
+- Keep responses clean: no typos, no random syllables, and do not mix languages in one sentence.
+
+If the user asks to speak with a human, reply with ONE short sentence and include direct links exactly once (no bullets), like:
+Telegram https://t.me/oleksiy_zhyvotivskyi | Viber viber://chat?number=%2B48512686628 | Messenger https://m.me/61559794323482
+Do not repeat contact labels below. Do not output placeholder brackets [] or empty list markers.
+
+Personalization:
+- If a customer name is provided (Customer Name below), occasionally address the user by name (1 out of ~4 messages), naturally and without overusing it.
 
 Grounding rules:
 - Prices and timelines MUST come from the structured knowledge below; do not alter ranges.
 - If supporting docs add relevant details, include them but do not contradict the structured data.
 - If the user asks beyond knowledge scope, say you can't provide exact numbers and recommend manager contact.
 
+Business Hours: {{businessHours}}
+
 Structured Site Knowledge (localized):
 {{{siteKnowledge}}}
 
 Supporting Docs (optional):
 {{{supportingDocs}}}
+
+Customer Name (optional): {{customerName}}
 
 Conversation History:
 {{#each chatHistory}}
@@ -237,6 +250,8 @@ Conversation History:
 
 User's new message:
 {{query}}
+
+When you share direct contact links, append a short one-sentence note with business hours like: "Hours: {{businessHours}} — message anytime, we usually reply even on weekends." Translate this note to the response language.
 
 Your response (strictly grounded, same language):
 `,
@@ -251,6 +266,7 @@ const webImpulsChatFlow = ai.defineFlow(
   async (input) => {
     const loc = input.locale || 'ua';
     const siteKnowledgeDynamic = buildSiteKnowledge(loc);
+    const businessHours = process.env.NEXT_PUBLIC_WORKING_HOURS || 'Mon–Fri, 9:00–18:00';
     let supportingDocs = '';
     if (input.query && input.query.trim().length > 0) {
       const docs = await fetchRelevantDocs(input.query, loc);
@@ -265,9 +281,14 @@ const webImpulsChatFlow = ai.defineFlow(
       ...input,
       siteKnowledge: siteKnowledgeDynamic,
       supportingDocs,
+      businessHours,
     });
     return output!;
   }
 );
+
+    
+
+    
 
     

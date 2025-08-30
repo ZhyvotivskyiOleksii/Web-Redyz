@@ -66,11 +66,11 @@ const UKFlagIcon = (props: React.SVGProps<SVGSVGElement>) => (
     </svg>
 );
 
-const RussianFlagIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="16" viewBox="0 0 900 600">
-        <rect width="900" height="600" fill="#fff"/>
-        <rect width="900" height="400" y="200" fill="#0039a6"/>
-        <rect width="900" height="200" y="400" fill="#d52b1e"/>
+const GermanFlagIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="16" viewBox="0 0 5 3">
+        <rect width="5" height="3" y="0" fill="#000"/>
+        <rect width="5" height="2" y="1" fill="#D00"/>
+        <rect width="5" height="1" y="2" fill="#FFCE00"/>
     </svg>
 );
 
@@ -78,7 +78,7 @@ const languages = [
   { code: 'ua', Flag: UkraineFlagIcon },
   { code: 'pl', Flag: PolandFlagIcon },
   { code: 'en', Flag: UKFlagIcon },
-  { code: 'ru', Flag: RussianFlagIcon },
+  { code: 'de', Flag: GermanFlagIcon },
 ];
 
 interface WebImpulsHeaderProps {
@@ -299,5 +299,9 @@ export function WebImpulsHeader({ theme, toggleTheme }: WebImpulsHeaderProps) {
     </header>
   );
 } 
+
+    
+
+    
 
     

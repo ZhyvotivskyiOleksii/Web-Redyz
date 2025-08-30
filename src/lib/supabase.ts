@@ -2,6 +2,8 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 let client: SupabaseClient | null = null;
 
+// Ініціалізує єдиний інстанс Supabase клієнта.
+// На сервері вимикаємо збереження сесій/refresh токенів (щоб не лізти в localStorage).
 export function getSupabaseClient() {
   if (client) return client;
 
@@ -14,9 +16,8 @@ export function getSupabaseClient() {
 
   const isServer = typeof window === 'undefined';
 
-  // On the server, disable session persistence and token refresh to avoid
-  // accessing localStorage and leaking state across users. In the browser,
-  // default behavior is fine for realtime subscriptions.
+  // На сервері: вимикаємо persistSession/autoRefreshToken, щоб уникнути проблем із server actions.
+  // У браузері: стандартні налаштування для Realtime.
   client = createClient(url, anonKey, {
     auth: isServer
       ? {

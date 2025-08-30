@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 export async function generateStaticParams() {
-  const locales = ['ua', 'pl', 'en'];
+  const locales = ['ua', 'pl', 'en', 'de'];
   return locales.map((locale) => ({ locale }));
 }
 
@@ -70,3 +70,7 @@ export default function RootLayout({
     </html>
   );
 }
+
+    
+
+    

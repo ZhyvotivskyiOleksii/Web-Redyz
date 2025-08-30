@@ -18,6 +18,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
+// Серверний екшен: створює ліда і надсилає сповіщення в Telegram
+import { createLeadFromForm } from "@/app/actions"
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -45,13 +47,33 @@ export function OrderForm() {
     },
   })
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log(values)
-    toast({
-      title: "Дякуємо за ваше замовлення!",
-      description: "Ми скоро зв'яжемося з вами.",
-    })
-    form.reset();
+  // Надсилання форми: відправляємо на сервер для створення ліда
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    try {
+      const res = await createLeadFromForm({
+        name: values.name,
+        contact: values.contact,
+        description: values.description,
+      })
+      if (res?.success) {
+        // Успішно: показуємо тост і очищаємо форму
+        toast({
+          title: "Дякуємо за ваше замовлення!",
+          description: "Ми скоро зв'яжемося з вами.",
+        })
+        form.reset();
+      } else {
+        // Помилка сервера/валідації
+        toast({
+          variant: "destructive",
+          title: "Помилка",
+          description: res?.error || "Не вдалося надіслати форму.",
+        })
+      }
+    } catch (e) {
+      // Форс-мажор: мережеві/інші помилки
+      toast({ variant: "destructive", title: "Помилка", description: "Сталася помилка." })
+    }
   }
 
   return (

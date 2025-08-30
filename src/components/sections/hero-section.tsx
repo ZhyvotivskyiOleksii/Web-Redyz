@@ -117,15 +117,15 @@ export function HeroSection() {
           >
             <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-foreground/80">
               <Clock className="h-4 w-4 text-primary" />
-              <span>24h cost estimate</span>
+              <span>{t.heroFeature1}</span>
             </div>
             <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-foreground/80">
               <ShieldCheck className="h-4 w-4 text-primary" />
-              <span>Contract & warranty</span>
+              <span>{t.heroFeature2}</span>
             </div>
             <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-foreground/80">
               <Star className="h-4 w-4 text-primary" />
-              <span>5.0 client rating</span>
+              <span>{t.heroFeature3}</span>
             </div>
           </motion.div>
 
@@ -185,3 +185,5 @@ export function HeroSection() {
     </section>
   );
 }
+
+    

@@ -1,3 +1,4 @@
+
 import fs from 'node:fs';
 import path from 'node:path';
 import { getSupabaseClient } from '@/lib/supabase';
@@ -42,7 +43,7 @@ export function loadKnowledgeJSON(): KnowledgeJSON {
   if (!cached || (stat && cached.mtimeMs !== stat.mtimeMs)) {
     const base: KnowledgeJSON = stat ? JSON.parse(fs.readFileSync(file, 'utf8')) : ({} as any);
     // Merge per-locale overrides if present: src/locales/{locale}/knowledge.json
-    const locales = ['ua', 'ru', 'en', 'pl'];
+    const locales = ['ua', 'de', 'en', 'pl'];
     for (const loc of locales) {
       const override = tryLoadPerLocale(loc);
       if (override) {
@@ -107,3 +108,7 @@ export async function fetchRelevantDocs(query: string, locale?: string) {
     return [] as Array<{ title: string; content: string }>;
   }
 }
+
+    
+
+    

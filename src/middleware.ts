@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import Negotiator from 'negotiator';
 
-const locales = ['ua', 'pl', 'en', 'ru'];
+const locales = ['ua', 'pl', 'en', 'de'];
 const defaultLocale = 'ua';
 
 function getLocale(request: NextRequest): string {
@@ -48,5 +48,9 @@ export const config = {
     '/((?!api|_next/static|_next/image|assets|favicon.ico|sw.js).*)',
   ],
 };
+
+    
+
+    
 
     
